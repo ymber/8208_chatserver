@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import hashlib
-import os
 import argparse
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
@@ -22,15 +21,13 @@ for i in range(0, args_dict["number"]):
     user_id = hashlib.sha256(key.public_key().public_bytes(
         serialization.Encoding.PEM,
         serialization.PublicFormat.SubjectPublicKeyInfo)).hexdigest()
-    password_hash = hashlib.pbkdf2_hmac("sha256", args_dict["password"].encode(), os.urandom(16),
-                                        600000).hex()
 
     with open(f"{user_id}_private.pem", "w") as file:
         file.write(
             key.private_bytes(
                 serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
                 serialization.BestAvailableEncryption(
-                    password_hash.encode())).decode())
+                    args_dict["password"].encode())).decode())
 
     with open(f"{user_id}_public.pem", "w") as file:
         file.write(key.public_key().public_bytes(
