@@ -53,15 +53,6 @@ class Server:
             conn.send(b"Authentication challenge failed")
             return None
 
-    def broadcast(self, user_id, msg):
-        for uid in self.clients:
-            if uid != user_id:
-                try:
-                    self.clients[user_id].send(msg.encode())
-                except:
-                    self.clients[user_id].close()
-                    del self.clients[user_id]
-
     def route_message(self, msg):
         msg_obj = json.loads(msg)
         dest_conn = self.clients[msg_obj["dest"]]
