@@ -4,6 +4,7 @@ import socket
 import select
 import sys
 import argparse
+import json
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import padding
@@ -57,6 +58,16 @@ class Client:
             print("Client registration protocol violation. Exiting.")
             sys.exit()
 
+        self.state = {"dest": None}
+
+    def command_handler(self, string):
+        if string[0:12] == "!DESTINATION":
+            self.state["dest"] = string[13:]
+
+    def send_message(self, string):
+        message = {"dest": self.state["dest"], "text": string}
+        self.server.send(json.dumps(message).encode())
+
     def execute(self):
         while True:
             read_sock, write_sock, err_sock = select.select(
@@ -66,8 +77,11 @@ class Client:
                     msg = sock.recv(4096)
                     print(msg)
                 else:
-                    msg = sys.stdin.readline()
-                    self.server.send(msg.encode())
+                    msg = sys.stdin.readline().strip()
+                    if msg[0] == "!":
+                        self.command_handler(msg)
+                    else:
+                        self.send_message(msg)
                     sys.stdout.write(f"<You> {msg}")
                     sys.stdout.flush()
 

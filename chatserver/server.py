@@ -5,6 +5,7 @@ import argparse
 import concurrent.futures
 import hashlib
 import os
+import json
 
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
@@ -61,6 +62,11 @@ class Server:
                     self.clients[user_id].close()
                     del self.clients[user_id]
 
+    def route_message(self, msg):
+        msg_obj = json.loads(msg)
+        dest_conn = self.clients[msg_obj["dest"]]
+        dest_conn.send(msg_obj["text"].strip().encode())
+
     def client_handler(self, user_id, addr):
         conn = self.clients[user_id]
         conn.send("Connection established".encode())
@@ -70,7 +76,7 @@ class Server:
                 msg = conn.recv(4096)
                 if msg:
                     print(f"<{addr[0]}> {msg}")
-                    self.broadcast(user_id, f"<{addr[0]}> {msg}")
+                    self.route_message(msg)
                 else:
                     del self.clients[user_id]
             except:
