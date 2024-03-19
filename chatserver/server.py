@@ -11,9 +11,9 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives import serialization
 
-args = argparse.ArgumentParser(description="server")
-args.add_argument("addr", action="store", help="ip address")
-args.add_argument("port", type=int, action="store", help="port")
+args = argparse.ArgumentParser(description="Chat server")
+args.add_argument("addr", action="store", help="IP address")
+args.add_argument("port", type=int, action="store", help="Port")
 args_dict = vars(args.parse_args())
 
 
