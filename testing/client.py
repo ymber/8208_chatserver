@@ -58,15 +58,19 @@ class Client:
             print("Client registration protocol violation. Exiting.")
             sys.exit()
 
-        self.state = {"dest": None}
+        self.state = {"msg_log": [], "dest": None}
 
     def command_handler(self, string):
         if string[0:12] == "!DESTINATION":
             self.state["dest"] = string[13:]
+        if string[0:9] == "!WRITELOG":
+            with open("message_log", "w+") as logfile:
+                logfile.write("\n".join(self.state["msg_log"]))
 
     def send_message(self, string):
-        message = {"dest": self.state["dest"], "text": string}
-        self.server.send(json.dumps(message).encode())
+        message = json.dumps({"dest": self.state["dest"], "text": string})
+        self.state["msg_log"].append(message)
+        self.server.send(message.encode())
 
     def execute(self):
         while True:
@@ -75,6 +79,7 @@ class Client:
             for sock in read_sock:
                 if sock == self.server:
                     msg = sock.recv(4096)
+                    self.state["msg_log"].append(msg.decode())
                     print(msg)
                 else:
                     msg = sys.stdin.readline().strip()
@@ -82,8 +87,6 @@ class Client:
                         self.command_handler(msg)
                     else:
                         self.send_message(msg)
-                    sys.stdout.write(f"<You> {msg}")
-                    sys.stdout.flush()
 
 
 if __name__ == "__main__":
