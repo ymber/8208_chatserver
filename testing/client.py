@@ -58,7 +58,7 @@ class Client:
             print("Client registration protocol violation. Exiting.")
             sys.exit()
 
-        self.state = {"msg_log": [], "dest": None}
+        self.state = {"msg_log": [], "dest": None, "keyring": {}}
 
     def command_handler(self, string):
         if string[0:12] == "!DESTINATION":
@@ -66,6 +66,13 @@ class Client:
         if string[0:9] == "!WRITELOG":
             with open("message_log", "w+") as logfile:
                 logfile.write("\n".join(self.state["msg_log"]))
+
+    def load_user_key(self, user_id):
+        self.server.send(f"!SENDKEY {user_id}".encode())
+        key_bytes = self.server.recv(4096)
+        key = serialization.load_pem_public_key(key_bytes)
+        self.state["keyring"][user_id] = key
+        return key
 
     def send_message(self, string):
         message = json.dumps({"dest": self.state["dest"], "text": string})
