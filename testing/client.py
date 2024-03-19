@@ -76,6 +76,10 @@ class Client:
         return key
 
     def send_message(self, string):
+        if not self.state["dest"]:
+            print("Cannot send message. No destination set.")
+            return
+
         if not self.state["dest"] in self.state["keyring"]:
             destination_key = self.load_user_key(self.state["dest"])
 
