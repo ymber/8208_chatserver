@@ -6,6 +6,7 @@ import concurrent.futures
 import hashlib
 import os
 import json
+import ssl
 
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
@@ -27,6 +28,8 @@ class Server:
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.sock.bind((args_dict["addr"], args_dict["port"]))
         self.sock.listen(100)
+        self.context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        self.ssock = self.context.wrap_socket(sock=self.sock, server_side=True)
 
     def identify_client(self, conn):
         conn.send(b"Send user_id")
@@ -77,7 +80,7 @@ class Server:
         with concurrent.futures.ThreadPoolExecutor() as executor:
             futures = []
             while True:
-                conn, addr = self.sock.accept()
+                conn, addr = self.ssock.accept()
                 user_id = self.identify_client(conn)
                 public_key = self.authenticate_user(conn, user_id)
                 self.clients[user_id] = conn

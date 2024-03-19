@@ -5,6 +5,7 @@ import select
 import sys
 import argparse
 import json
+import ssl
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import padding
@@ -31,15 +32,18 @@ class Client:
             self.public_key = serialization.load_pem_public_key(keyfile.read())
 
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.server.connect((args_dict["addr"], args_dict["port"]))
+        self.context = ssl.create_default_context()
+        self.context.check_hostname = False
+        self.ssock = self.context.wrap_socket(self.server)
+        self.ssock.connect((args_dict["addr"], args_dict["port"]))
 
-        if self.server.recv(256) == b"Send user_id":
-            self.server.send(user_id.encode())
+        if self.ssock.recv(256) == b"Send user_id":
+            self.ssock.send(user_id.encode())
         else:
             print("Client registration protocol violation. Exiting.")
             sys.exit()
-        if self.server.recv(256) == b"Send public key":
-            self.server.send(
+        if self.ssock.recv(256) == b"Send public key":
+            self.ssock.send(
                 self.public_key.public_bytes(
                     serialization.Encoding.PEM,
                     serialization.PublicFormat.SubjectPublicKeyInfo))
@@ -47,12 +51,12 @@ class Client:
             print("Client registration protocol violation. Exiting.")
             sys.exit()
 
-        challenge_ciphertext = self.server.recv(4096)
+        challenge_ciphertext = self.ssock.recv(4096)
         challenge = self.private_key.decrypt(
             challenge_ciphertext,
             padding.OAEP(padding.MGF1(hashes.SHA256()), hashes.SHA256(), None))
-        self.server.send(challenge)
-        if self.server.recv(256) == b"User authenticated":
+        self.ssock.send(challenge)
+        if self.ssock.recv(256) == b"User authenticated":
             print("Authenticated")
         else:
             print("Client registration protocol violation. Exiting.")
@@ -66,14 +70,14 @@ class Client:
 
     def send_message(self, string):
         message = {"dest": self.state["dest"], "text": string}
-        self.server.send(json.dumps(message).encode())
+        self.ssock.send(json.dumps(message).encode())
 
     def execute(self):
         while True:
             read_sock, write_sock, err_sock = select.select(
-                [sys.stdin, self.server], [], [])
+                [sys.stdin, self.ssock], [], [])
             for sock in read_sock:
-                if sock == self.server:
+                if sock == self.ssock:
                     msg = sock.recv(4096)
                     print(msg)
                 else:
