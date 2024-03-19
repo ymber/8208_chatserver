@@ -5,6 +5,7 @@ import select
 import sys
 import argparse
 import json
+import base64
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import padding
@@ -75,9 +76,30 @@ class Client:
         return key
 
     def send_message(self, string):
-        message = json.dumps({"dest": self.state["dest"], "text": string})
+        if not self.state["dest"] in self.state["keyring"]:
+            destination_key = self.load_user_key(self.state["dest"])
+
+        ciphertext = destination_key.encrypt(
+            string.encode(),
+            padding.OAEP(padding.MGF1(algorithm=hashes.SHA256()),
+                         hashes.SHA256(), None))
+        ciphertext_b64_str = base64.b64encode(ciphertext).decode()
+
+        message = json.dumps({
+            "dest": self.state["dest"],
+            "text": ciphertext_b64_str
+        })
         self.state["msg_log"].append(message)
         self.server.send(message.encode())
+
+    def receive_message(self, string):
+        ciphertext = base64.b64decode(string)
+        message_text = self.private_key.decrypt(
+            ciphertext,
+            padding.OAEP(padding.MGF1(hashes.SHA256()), hashes.SHA256(),
+                         None)).decode()
+        self.state["msg_log"].append(message_text)
+        print(message_text)
 
     def execute(self):
         while True:
@@ -86,8 +108,7 @@ class Client:
             for sock in read_sock:
                 if sock == self.server:
                     msg = sock.recv(4096)
-                    self.state["msg_log"].append(msg.decode())
-                    print(msg)
+                    self.receive_message(msg)
                 else:
                     msg = sys.stdin.readline().strip()
                     if msg[0] == "!":
