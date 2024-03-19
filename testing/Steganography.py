@@ -9,6 +9,7 @@ class Steganography:
     def __init__(self):
         self.private_key, self.public_key = self.generate_key_pair()
         self.hmac_key = secrets.token_bytes(32)
+        self.marker = b'\xff\x00\x00\xff'
 
     def generate_key_pair(self):
         key = RSA.generate(2048)
@@ -99,44 +100,7 @@ class Steganography:
         extracted_message = self.extract_message(encrypted_message_with_hmac)
 
         return extracted_message
-
-class SteganographyMP3:
-    def __init__(self):
-        self.private_key, self.public_key = self.generate_key_pair()
-        self.hmac_key = secrets.token_bytes(32)
-
-    def generate_key_pair(self):
-        key = RSA.generate(2048)
-        private_key = key.export_key()
-        public_key = key.publickey().export_key()
-        return private_key, public_key
-
-    def encrypt_message(self, public_key, message):
-        cipher = PKCS1_OAEP.new(RSA.import_key(public_key))
-        encrypted_message = cipher.encrypt(message.encode())
-        return encrypted_message
-
-    def decrypt_message(self, encrypted_message):
-        cipher = PKCS1_OAEP.new(RSA.import_key(self.private_key))
-        decrypted_message = cipher.decrypt(encrypted_message)
-
-        return decrypted_message
-
-    def add_hmac(self, encrypted_message):
-        hmac_digest = hmac.new(self.hmac_key, encrypted_message, hashlib.sha256).digest()
-
-        return encrypted_message + hmac_digest
-
-    def extract_message(self, encrypted_data):
-        hmac_digest = encrypted_data[-32:]
-        encrypted_message = encrypted_data[:-32]
-        computed_hmac = hmac.new(self.hmac_key, encrypted_message, hashlib.sha256).digest()
-
-        if hmac.compare_digest(hmac_digest, computed_hmac):
-            return self.decrypt_message(encrypted_message)
-        else:
-            raise ValueError("HMAC verification failed. Possible tampering detected.")
-
+    
     def hide_message_in_mp3(self, mp3_path, message):
         with open(mp3_path, "rb") as file:
             mp3_data = bytearray(file.read())
@@ -179,32 +143,12 @@ class SteganographyMP3:
         extracted_message = self.extract_message(encrypted_message_with_hmac)
 
         return extracted_message
-
-class SteganographyMP4:
-    def __init__(self):
-        self.hmac_key = secrets.token_bytes(32)
-        self.marker = b'\xff\x00\x00\xff'
-
-    def add_hmac(self, encrypted_message):
-        hmac_digest = hmac.new(self.hmac_key, encrypted_message, hashlib.sha256).digest()
-
-        return encrypted_message + hmac_digest
-
-    def extract_message(self, encrypted_data):
-        hmac_digest = encrypted_data[-32:] 
-        encrypted_message = encrypted_data[:-32]
-        computed_hmac = hmac.new(self.hmac_key, encrypted_message, hashlib.sha256).digest()
-
-        if hmac.compare_digest(hmac_digest, computed_hmac):
-            return encrypted_message
-        else:
-            raise ValueError("HMAC verification failed.")
-
+    
     def hide_message_in_mp4(self, mp4_path, message):
         with open(mp4_path, "rb") as f:
             mp4_data = f.read()
 
-        encrypted_message = message.encode()
+        encrypted_message = self.encrypt_message(self.public_key, message)
         encrypted_message_with_hmac = self.add_hmac(encrypted_message)
 
         mp4_data = mp4_data + self.marker + encrypted_message_with_hmac
@@ -225,20 +169,18 @@ class SteganographyMP4:
         extracted_message = self.extract_message(encrypted_message_with_hmac)
 
         return extracted_message
+    
+message = "Test message."
 
-message = "Test message. Test message. Test message. Test message. Test message. Test message. Test message. Test message. Test message. Test message. Test message. Test message."
+steg = Steganography()
 
-# steg = Steganography()
- #steg = SteganographyMP3()
-steg = SteganographyMP4()
-
-# steg.hide_message_in_image("test.png", message)
-# extracted_message = steg.extract_message_from_image("stego_image.png")
+steg.hide_message_in_image("test.png", message)
+extracted_message = steg.extract_message_from_image("stego_image.png")
 
 # steg.hide_message_in_mp3("test.mp3", message)
 # extracted_message = steg.extract_message_from_mp3("stego_audio.mp3")
 
-steg.hide_message_in_mp4("test.mp4", message)
-extracted_message = steg.extract_message_from_mp4("stego_video.mp4")
+# steg.hide_message_in_mp4("test.mp4", message)
+# extracted_message = steg.extract_message_from_mp4("stego_video.mp4")
 
 print("Extracted message:", extracted_message.decode())
