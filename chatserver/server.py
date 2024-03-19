@@ -60,7 +60,6 @@ class Server:
 
     def client_handler(self, user_id, addr):
         conn = self.clients[user_id]
-        conn.send("Connection established".encode())
 
         while True:
             try:
