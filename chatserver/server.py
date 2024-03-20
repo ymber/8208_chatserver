@@ -48,26 +48,33 @@ class Server:
         conn.send(ciphertext)
         if conn.recv(256) == challenge:
             conn.send(b"User authenticated")
-            return public_key
+            return public_key_bytes
         else:
             conn.send(b"Authentication challenge failed")
             return None
 
+    def command_handler(self, string, sender):
+        if string[0:8] == "!SENDKEY":
+            user_id = string[9:]
+            self.clients[sender].send(self.user_keys[user_id])
+
     def route_message(self, msg):
         msg_obj = json.loads(msg)
-        dest_conn = self.clients[msg_obj["dest"]]
-        dest_conn.send(msg_obj["text"].strip().encode())
+        dest_conn = self.clients[msg_obj["dest"]["val"]]
+        dest_conn.send(msg)
 
     def client_handler(self, user_id, addr):
         conn = self.clients[user_id]
-        conn.send("Connection established".encode())
 
         while True:
             try:
                 msg = conn.recv(4096)
                 if msg:
                     print(f"<{addr[0]}> {msg}")
-                    self.route_message(msg)
+                    if msg.decode()[0] == "!":
+                        self.command_handler(msg.decode(), user_id)
+                    else:
+                        self.route_message(msg)
                 else:
                     del self.clients[user_id]
             except:
