@@ -1,56 +1,13 @@
-from Crypto.PublicKey import RSA
-from Crypto.Cipher import PKCS1_OAEP
-import hmac
-import hashlib
-import secrets
 import cv2
 
 class Steganography:
     def __init__(self):
-        self.private_key, self.public_key = self.generate_key_pair()
-        self.hmac_key = secrets.token_bytes(32)
         self.marker = b'\xff\x00\x00\xff'
-
-    def generate_key_pair(self):
-        key = RSA.generate(2048)
-        private_key = key.export_key()
-        public_key = key.publickey().export_key()
-
-        return private_key, public_key
-
-    def encrypt_message(self, public_key, message):
-        cipher = PKCS1_OAEP.new(RSA.import_key(public_key))
-        encrypted_message = cipher.encrypt(message.encode())
-
-        return encrypted_message
-
-    def decrypt_message(self, encrypted_message):
-        cipher = PKCS1_OAEP.new(RSA.import_key(self.private_key))
-        decrypted_message = cipher.decrypt(encrypted_message)
-
-        return decrypted_message
-
-    def add_hmac(self, encrypted_message):
-        hmac_digest = hmac.new(self.hmac_key, encrypted_message, hashlib.sha256).digest()
-
-        return encrypted_message + hmac_digest
-
-    def extract_message(self, encrypted_data):
-        hmac_digest = encrypted_data[-32:]
-        encrypted_message = encrypted_data[:-32]
-        computed_hmac = hmac.new(self.hmac_key, encrypted_message, hashlib.sha256).digest()
-
-        if hmac.compare_digest(hmac_digest, computed_hmac):
-            return self.decrypt_message(encrypted_message)
-        else:
-            raise ValueError("HMAC verification failed.")
 
     def hide_message_in_image(self, image_path, message):
         img = cv2.imread(image_path)
 
-        encrypted_message = self.encrypt_message(self.public_key, message)
-        encrypted_message_with_hmac = self.add_hmac(encrypted_message)
-        binary_message = ''.join(format(byte, '08b') for byte in encrypted_message_with_hmac)
+        binary_message = ''.join(format(byte, '08b') for byte in message.encode('utf-8'))
         binary_message += '1111111111111110'
 
         if len(binary_message) > img.size * 3:
@@ -96,19 +53,15 @@ class Steganography:
 
         binary_message = binary_message[:-16]
 
-        encrypted_message_with_hmac = int(binary_message, 2).to_bytes((len(binary_message) + 7) // 8, byteorder='big')
-        extracted_message = self.extract_message(encrypted_message_with_hmac)
+        message = int(binary_message, 2).to_bytes((len(binary_message) + 7) // 8, byteorder='big')
 
-        return extracted_message
+        return message
     
     def hide_message_in_mp3(self, mp3_path, message):
         with open(mp3_path, "rb") as file:
             mp3_data = bytearray(file.read())
 
-        encrypted_message = self.encrypt_message(self.public_key, message)
-        encrypted_message_with_hmac = self.add_hmac(encrypted_message)
-
-        binary_message = ''.join(format(byte, '08b') for byte in encrypted_message_with_hmac)
+        binary_message = ''.join(format(byte, '08b') for byte in message.encode('utf-8'))
         binary_message += '1111111111111110'
 
         if len(binary_message) > len(mp3_data):
@@ -139,19 +92,15 @@ class Steganography:
 
         binary_message = binary_message[:-16]
 
-        encrypted_message_with_hmac = int(binary_message, 2).to_bytes((len(binary_message) + 7) // 8, byteorder='big')
-        extracted_message = self.extract_message(encrypted_message_with_hmac)
+        message = int(binary_message, 2).to_bytes((len(binary_message) + 7) // 8, byteorder='big')
 
-        return extracted_message
+        return message
     
     def hide_message_in_mp4(self, mp4_path, message):
         with open(mp4_path, "rb") as f:
             mp4_data = f.read()
 
-        encrypted_message = self.encrypt_message(self.public_key, message)
-        encrypted_message_with_hmac = self.add_hmac(encrypted_message)
-
-        mp4_data = mp4_data + self.marker + encrypted_message_with_hmac
+        mp4_data = mp4_data + self.marker + message.encode('utf-8')
 
         with open("stego_video.mp4", "wb") as f:
             f.write(mp4_data)
@@ -165,14 +114,13 @@ class Steganography:
         if start_index == -1:
             raise ValueError("Marker not found in MP4 file.")
 
-        encrypted_message_with_hmac = mp4_data[start_index + len(self.marker):]
-        extracted_message = self.extract_message(encrypted_message_with_hmac)
+        message = mp4_data[start_index + len(self.marker):]
 
-        return extracted_message
-    
-message = "Test message."
+        return message
 
 steg = Steganography()
+
+message = "Test message."
 
 steg.hide_message_in_image("test.png", message)
 extracted_message = steg.extract_message_from_image("stego_image.png")
