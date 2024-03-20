@@ -117,18 +117,3 @@ class Steganography:
         message = mp4_data[start_index + len(self.marker):]
 
         return message
-
-steg = Steganography()
-
-message = "Test message."
-
-steg.hide_message_in_image("test.png", message)
-extracted_message = steg.extract_message_from_image("stego_image.png")
-
-# steg.hide_message_in_mp3("test.mp3", message)
-# extracted_message = steg.extract_message_from_mp3("stego_audio.mp3")
-
-# steg.hide_message_in_mp4("test.mp4", message)
-# extracted_message = steg.extract_message_from_mp4("stego_video.mp4")
-
-print("Extracted message:", extracted_message.decode())
