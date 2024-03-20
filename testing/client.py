@@ -21,21 +21,21 @@ class Client:
 
     def __init__(self):
         print("Enter user id")
-        user_id = sys.stdin.readline().strip()
+        self.user_id = sys.stdin.readline().strip()
         print("Enter private key password")
         keypass = sys.stdin.readline().strip()
-        with open(f"{user_id}_private.pem", "rb") as keyfile:
+        with open(f"{self.user_id}_private.pem", "rb") as keyfile:
             self.private_key = serialization.load_pem_private_key(
                 keyfile.read(), password=keypass.encode())
 
-        with open(f"{user_id}_public.pem", "rb") as keyfile:
+        with open(f"{self.user_id}_public.pem", "rb") as keyfile:
             self.public_key = serialization.load_pem_public_key(keyfile.read())
 
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server.connect((args_dict["addr"], args_dict["port"]))
 
         if self.server.recv(256) == b"Send user_id":
-            self.server.send(user_id.encode())
+            self.server.send(self.user_id.encode())
         else:
             print("Client registration protocol violation. Exiting.")
             sys.exit()
