@@ -10,6 +10,7 @@ import base64
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives import hashes
+from cryptography.exceptions import InvalidSignature
 
 args = argparse.ArgumentParser(description="Chat client")
 args.add_argument("addr", action="store", help="IP address")
@@ -75,6 +76,39 @@ class Client:
         self.state["keyring"][user_id] = key
         return key
 
+    def sign_message(self, msg_obj):
+        sig_origin = self.private_key.sign(
+            msg_obj["origin"].encode(),
+            padding.PSS(mgf=padding.MGF1(hashes.SHA256()),
+                        salt_length=padding.PSS.MAX_LENGTH), hashes.SHA256())
+
+        sig_dest = self.private_key.sign(
+            msg_obj["dest"].encode(),
+            padding.PSS(mgf=padding.MGF1(hashes.SHA256()),
+                        salt_length=padding.PSS.MAX_LENGTH), hashes.SHA256())
+
+        sig_ciphertext = self.private_key.sign(
+            msg_obj["text"].encode(),
+            padding.PSS(mgf=padding.MGF1(hashes.SHA256()),
+                        salt_length=padding.PSS.MAX_LENGTH), hashes.SHA256())
+
+        signed_msg = {
+            "origin": {
+                "sig": base64.b64encode(sig_origin).decode(),
+                "val": msg_obj["origin"]
+            },
+            "dest": {
+                "sig": base64.b64encode(sig_dest).decode(),
+                "val": msg_obj["dest"]
+            },
+            "text": {
+                "sig": base64.b64encode(sig_ciphertext).decode(),
+                "val": msg_obj["text"]
+            }
+        }
+
+        return signed_msg
+
     def send_message(self, string):
         if not self.state["dest"]:
             print("Cannot send message. No destination set.")
@@ -91,21 +125,65 @@ class Client:
                          hashes.SHA256(), None))
         ciphertext_b64_str = base64.b64encode(ciphertext).decode()
 
-        message = json.dumps({
+        message = {
+            "origin": self.user_id,
             "dest": self.state["dest"],
             "text": ciphertext_b64_str
-        })
-        self.state["msg_log"].append(message)
-        self.server.send(message.encode())
+        }
+
+        signed_msg = json.dumps(self.sign_message(message))
+
+        self.state["msg_log"].append(json.dumps(message))
+        self.server.send(signed_msg.encode())
+
+    def verify_signatures(self, msg):
+        if not msg["origin"]["val"] in self.state["keyring"]:
+            key = self.load_user_key(msg["origin"]["val"])
+        else:
+            key = self.state["keyring"][msg["origin"]["val"]]
+
+        try:
+            origin_sig_bytes = base64.b64decode(msg["origin"]["sig"])
+            key.verify(
+                origin_sig_bytes, msg["origin"]["val"].encode(),
+                padding.PSS(mgf=padding.MGF1(hashes.SHA256()),
+                            salt_length=padding.PSS.MAX_LENGTH),
+                hashes.SHA256())
+
+            dest_sig_bytes = base64.b64decode(msg["dest"]["sig"])
+            key.verify(
+                dest_sig_bytes, msg["dest"]["val"].encode(),
+                padding.PSS(mgf=padding.MGF1(hashes.SHA256()),
+                            salt_length=padding.PSS.MAX_LENGTH),
+                hashes.SHA256())
+
+            text_sig_bytes = base64.b64decode(msg["text"]["sig"])
+            key.verify(
+                text_sig_bytes, msg["text"]["val"].encode(),
+                padding.PSS(mgf=padding.MGF1(hashes.SHA256()),
+                            salt_length=padding.PSS.MAX_LENGTH),
+                hashes.SHA256())
+
+        except InvalidSignature:
+            return False
+
+        return True
 
     def receive_message(self, string):
-        ciphertext = base64.b64decode(string)
+        msg_obj = json.loads(string)
+        if self.verify_signatures(msg_obj) == False:
+            print("Invalid signature")
+            return
+
+        ciphertext = base64.b64decode(msg_obj["text"]["val"])
         message_text = self.private_key.decrypt(
             ciphertext,
             padding.OAEP(padding.MGF1(hashes.SHA256()), hashes.SHA256(),
                          None)).decode()
-        self.state["msg_log"].append(message_text)
-        print(message_text)
+
+        out_string = f"<{msg_obj['origin']['val']}> {message_text}"
+        self.state["msg_log"].append(out_string)
+        print(out_string)
 
     def execute(self):
         while True:

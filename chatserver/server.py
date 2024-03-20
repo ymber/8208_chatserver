@@ -60,8 +60,8 @@ class Server:
 
     def route_message(self, msg):
         msg_obj = json.loads(msg)
-        dest_conn = self.clients[msg_obj["dest"]]
-        dest_conn.send(msg_obj["text"].strip().encode())
+        dest_conn = self.clients[msg_obj["dest"]["val"]]
+        dest_conn.send(msg)
 
     def client_handler(self, user_id, addr):
         conn = self.clients[user_id]
