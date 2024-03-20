@@ -82,6 +82,8 @@ class Client:
 
         if not self.state["dest"] in self.state["keyring"]:
             destination_key = self.load_user_key(self.state["dest"])
+        else:
+            destination_key = self.state["keyring"][self.state["dest"]]
 
         ciphertext = destination_key.encrypt(
             string.encode(),
