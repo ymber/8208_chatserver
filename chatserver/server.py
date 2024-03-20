@@ -54,8 +54,8 @@ class Server:
             return None
 
     def command_handler(self, string, sender):
-        if string[0:8] == "!SENDKEY":
-            user_id = string[9:]
+        if string.split()[0] == "!SENDKEY":
+            user_id = string.split()[1]
             self.clients[sender].send(self.user_keys[user_id])
 
     def route_message(self, msg):

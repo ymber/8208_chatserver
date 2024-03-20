@@ -63,9 +63,9 @@ class Client:
         self.state = {"msg_log": [], "dest": None, "keyring": {}}
 
     def command_handler(self, string):
-        if string[0:12] == "!DESTINATION":
-            self.state["dest"] = string[13:]
-        if string[0:9] == "!WRITELOG":
+        if string.split()[0] == "!DESTINATION":
+            self.state["dest"] = string.split()[1]
+        if string.split()[0] == "!WRITELOG":
             with open("message_log", "w+") as logfile:
                 logfile.write("\n".join(self.state["msg_log"]))
 
