@@ -1,13 +1,46 @@
+#!/usr/bin/env python3
+
+import argparse
 import cv2
+import base64
+import sys
+
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives import hashes
+
+args = argparse.ArgumentParser(description="Steganography script")
+args.add_argument("operation",
+                  type=str,
+                  action="store",
+                  help="Mode of operation. Must be one of encode or decode.")
+args.add_argument("file", type=str, action="store", help="File to operate on.")
+args.add_argument("keyfile",
+                  type=str,
+                  action="store",
+                  help="Public key to encrypt message with.")
+args.add_argument("type",
+                  type=str,
+                  action="store",
+                  help="File type. Must be one of image, mp3, mp4.")
+args.add_argument("message",
+                  nargs="?",
+                  type=str,
+                  action="store",
+                  help="Message to encode. Must be provided in encode mode.")
+args_dict = vars(args.parse_args())
+
 
 class Steganography:
+
     def __init__(self):
         self.marker = b'\xff\x00\x00\xff'
 
     def hide_message_in_image(self, image_path, message):
         img = cv2.imread(image_path)
 
-        binary_message = ''.join(format(byte, '08b') for byte in message.encode('utf-8'))
+        binary_message = ''.join(
+            format(byte, '08b') for byte in message.encode('utf-8'))
         binary_message += '1111111111111110'
 
         if len(binary_message) > img.size * 3:
@@ -19,7 +52,8 @@ class Steganography:
             for j in range(img.shape[1]):
                 for k in range(img.shape[2]):
                     if data_index < len(binary_message):
-                        img[i, j, k] = (img[i, j, k] & ~1) | int(binary_message[data_index])
+                        img[i, j, k] = (img[i, j, k] & ~1) | int(
+                            binary_message[data_index])
                         data_index += 1
                     else:
                         break
@@ -53,15 +87,17 @@ class Steganography:
 
         binary_message = binary_message[:-16]
 
-        message = int(binary_message, 2).to_bytes((len(binary_message) + 7) // 8, byteorder='big')
+        message = int(binary_message, 2).to_bytes(
+            (len(binary_message) + 7) // 8, byteorder='big')
 
         return message
-    
+
     def hide_message_in_mp3(self, mp3_path, message):
         with open(mp3_path, "rb") as file:
             mp3_data = bytearray(file.read())
 
-        binary_message = ''.join(format(byte, '08b') for byte in message.encode('utf-8'))
+        binary_message = ''.join(
+            format(byte, '08b') for byte in message.encode('utf-8'))
         binary_message += '1111111111111110'
 
         if len(binary_message) > len(mp3_data):
@@ -71,7 +107,8 @@ class Steganography:
 
         for i in range(len(mp3_data)):
             if data_index < len(binary_message):
-                mp3_data[i] = (mp3_data[i] & ~1) | int(binary_message[data_index])
+                mp3_data[i] = (mp3_data[i] & ~1) | int(
+                    binary_message[data_index])
                 data_index += 1
             else:
                 break
@@ -92,10 +129,11 @@ class Steganography:
 
         binary_message = binary_message[:-16]
 
-        message = int(binary_message, 2).to_bytes((len(binary_message) + 7) // 8, byteorder='big')
+        message = int(binary_message, 2).to_bytes(
+            (len(binary_message) + 7) // 8, byteorder='big')
 
         return message
-    
+
     def hide_message_in_mp4(self, mp4_path, message):
         with open(mp4_path, "rb") as f:
             mp4_data = f.read()
@@ -117,3 +155,42 @@ class Steganography:
         message = mp4_data[start_index + len(self.marker):]
 
         return message
+
+
+if __name__ == "__main__":
+    steg = Steganography()
+
+    if args_dict["operation"] == "encode":
+        encoders = {
+            "image": steg.hide_message_in_image,
+            "mp3": steg.hide_message_in_mp3,
+            "mp4": steg.hide_message_in_mp4
+        }
+        with open(args_dict["keyfile"], "rb") as keyfile:
+            key = serialization.load_pem_public_key(keyfile.read())
+            ciphertext = key.encrypt(
+                args_dict["message"].encode(),
+                padding.OAEP(padding.MGF1(algorithm=hashes.SHA256()),
+                             hashes.SHA256(), None))
+            ciphertext_b64_str = base64.b64encode(ciphertext).decode()
+
+            encoders[args_dict["type"]](args_dict["file"], ciphertext_b64_str)
+
+    elif args_dict["operation"] == "decode":
+        decoders = {
+            "image": steg.extract_message_from_image,
+            "mp3": steg.extract_message_from_mp3,
+            "mp4": steg.extract_message_from_mp4
+        }
+        with open(args_dict["keyfile"], "rb") as keyfile:
+            print("Enter private key password")
+            keypass = sys.stdin.readline().strip()
+            key = serialization.load_pem_private_key(keyfile.read(),
+                                                     password=keypass.encode())
+            ciphertext_b64_str = decoders[args_dict["type"]](args_dict["file"])
+            ciphertext = base64.b64decode(ciphertext_b64_str)
+            message = key.decrypt(
+                ciphertext,
+                padding.OAEP(padding.MGF1(hashes.SHA256()), hashes.SHA256(),
+                             None)).decode()
+            print(message)
