@@ -68,6 +68,10 @@ class Client:
         if string.split()[0] == "!WRITELOG":
             with open("message_log", "w+") as logfile:
                 logfile.write("\n".join(self.state["msg_log"]))
+        if string.split()[0] == "!SENDFILE":
+            with open(string.split()[1], "rb") as file:
+                file_data = base64.b64encode(file.read()).decode()
+                self.send_message(f"!FILE{file_data}")
 
     def load_user_key(self, user_id):
         self.server.send(f"!SENDKEY {user_id}".encode())
@@ -181,9 +185,14 @@ class Client:
             padding.OAEP(padding.MGF1(hashes.SHA256()), hashes.SHA256(),
                          None)).decode()
 
-        out_string = f"<{msg_obj['origin']['val']}> {message_text}"
-        self.state["msg_log"].append(out_string)
-        print(out_string)
+        if message_text[0:5] == "!FILE":
+            file_data = base64.b64decode(message_text[5:])
+            with open("fname", "wb+") as file:
+                file.write(file_data)
+        else:
+            out_string = f"<{msg_obj['origin']['val']}> {message_text}"
+            self.state["msg_log"].append(out_string)
+            print(out_string)
 
     def execute(self):
         while True:
