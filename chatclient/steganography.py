@@ -187,7 +187,6 @@ if __name__ == "__main__":
                              hashes.SHA256(), None))
             ciphertext_b64_str = base64.b64encode(ciphertext).decode()
 
-            encoders[args_dict["type"]](args_dict["file"], ciphertext_b64_str)
             random_bits = encoders[args_dict["type"]](args_dict["file"], ciphertext_b64_str)
 
     elif args_dict["operation"] == "decode":
