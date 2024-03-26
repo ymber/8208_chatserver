@@ -4,6 +4,7 @@ import argparse
 import cv2
 import base64
 import sys
+import random
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import padding
@@ -48,12 +49,16 @@ class Steganography:
 
         data_index = 0
 
+        random_bits = []
+
         for i in range(img.shape[0]):
             for j in range(img.shape[1]):
                 for k in range(img.shape[2]):
                     if data_index < len(binary_message):
-                        img[i, j, k] = (img[i, j, k] & ~1) | int(
-                            binary_message[data_index])
+                        random_bit = random.randint(0, 1)
+                        random_bits.append(random_bit) 
+                        lsb = int(binary_message[data_index]) ^ random_bit
+                        img[i, j, k] = (img[i, j, k] & ~1) | lsb
                         data_index += 1
                     else:
                         break
@@ -66,18 +71,26 @@ class Steganography:
 
         cv2.imwrite("stego_image.png", img)
 
-    def extract_message_from_image(self, image_path):
+        return random_bits
+
+    def extract_message_from_image(self, image_path, random_bits):
         img = cv2.imread(image_path)
 
         binary_message = ''
 
+        random_bits_index = 0
+
         for i in range(img.shape[0]):
             for j in range(img.shape[1]):
                 for k in range(img.shape[2]):
-                    binary_message += str(img[i, j, k] & 1)
+                    extracted_lsb = img[i, j, k] & 1
+                    random_bit = random_bits[random_bits_index]
+                    extracted_lsb ^= random_bit
+                    binary_message += str(extracted_lsb)
 
                     if binary_message[-16:] == '1111111111111110':
                         break
+                    random_bits_index += 1
                 else:
                     continue
                 break
@@ -175,6 +188,7 @@ if __name__ == "__main__":
             ciphertext_b64_str = base64.b64encode(ciphertext).decode()
 
             encoders[args_dict["type"]](args_dict["file"], ciphertext_b64_str)
+            random_bits = encoders[args_dict["type"]](args_dict["file"], ciphertext_b64_str)
 
     elif args_dict["operation"] == "decode":
         decoders = {
